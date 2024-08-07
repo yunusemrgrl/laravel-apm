@@ -23,9 +23,9 @@ Route::middleware(['apm-metrics', 'apm-tracing'])->group(function () {
     // Your routes here
 }); -->
 
-# Installing and Setting Up Our OpenTelemetry Logging Package
+# Laravel APM
 
-This guide will walk you through the process of installing and configuring our OpenTelemetry logging package in your Laravel project.
+This guide will walk you through the process of installing and configuring our Laravel apm package in your project.
 
 ## Prerequisites
 
@@ -35,13 +35,24 @@ This guide will walk you through the process of installing and configuring our O
 
 ## Installation
 
+To install the package, follow these steps:
+
 1. Install the package using Composer:
 
    ```bash
    composer require Middleware/laravel-apm
    ```
 
-2. Publish the package configuration:
+2. Add the service provider to the `providers` array in `config/app.php`:
+    
+    ```bash
+    'providers' => [
+        // ...
+        Middleware\LaravelApm\LaravelApmServiceProvider::class,
+    ],
+    ```
+
+3. Publish the package configuration:
 
     ```bash
     php artisan vendor:publish --provider="Middleware\LaravelAPM\LaravelAPMServiceProvider"
@@ -68,9 +79,41 @@ This guide will walk you through the process of installing and configuring our O
     ```bash
     APM_SERVICE_NAME=your-app-name
     ```
-    
-## Usage
+Make sure to set the appropriate values for your OpenTelemetry collector setup.
 
-To use the OpenTelemetry logger in your Laravel application:
+## Tracing
 
-1. Update your `config/logging.php` to include our custom channel:
+Laravel APM provides a middleware class to enable tracing. 
+To register the tracing middleware, follow these steps:
+
+1. Open `app/Http/Kernel.php` file.
+
+2. Add the middleware to `$middleware` array:
+    ```bash
+    protected $middleware = [
+        // ...
+        \Middleware\LaravelApm\Middleware\TracingMiddleware::class,
+    ];
+    ```
+
+## Logging
+
+The package integrates with Laravel's logging system to capture and export logs. The logs will be sent to the configured OpenTelemetry collector.
+To enable logging, make sure you have configured the appropriate log driver and settings in your Laravel application. The package will automatically capture and export the logs to the OpenTelemetry collector.
+
+## Metrics
+
+As of now, there's very little support for metrics, We'll be adding more metrics in future.
+For enabling traces-related metrics, follow these steps:
+
+1. Open `app/Http/Kernel.php` file.
+
+2. Add the middleware to `$middleware` array:
+    ```bash
+    protected $middleware = [
+        // ...
+        \Middleware\LaravelApm\Middleware\MetricsMiddleware::class,
+    ];
+    ```
+
+2. If you have enabled tracing, then add this middleware after tracing.
