@@ -49,7 +49,9 @@ class LaravelApm
     public function exportMetrics()
     {
         try {
-            return $this->exportingReader->collect();
+            $result = $this->exportingReader->collect();
+            \Log::info('Metrics exported', ['result' => $result]);
+            return $result;
         } catch (\Exception $e) {
             Log::error('Error exporting metrics', [
                 'error' => $e->getMessage(),

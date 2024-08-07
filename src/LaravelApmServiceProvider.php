@@ -8,12 +8,12 @@ use OpenTelemetry\Contrib\Instrumentation\Laravel\LaravelInstrumentation;
 use OpenTelemetry\API\Trace\TracerProviderInterface;
 use OpenTelemetry\API\Logs\LoggerProviderInterface;
 use OpenTelemetry\API\Metrics\MeterProviderInterface;
+use OpenTelemetry\SDK\Common\Export\Http\PsrTransportFactory;
 use OpenTelemetry\SDK\Trace\TracerProvider;
 use OpenTelemetry\SDK\Logs\LoggerProvider;
 use OpenTelemetry\SDK\Metrics\MeterProvider;
 use OpenTelemetry\SDK\Trace\SpanProcessor\SimpleSpanProcessor;
 use OpenTelemetry\SDK\Logs\Processor\SimpleLogRecordProcessor as LogProcessor;
-use OpenTelemetry\Contrib\Otlp\OtlpHttpTransportFactory;
 use OpenTelemetry\Contrib\Otlp\SpanExporter;
 use OpenTelemetry\Contrib\Otlp\LogsExporter;
 use OpenTelemetry\Contrib\Otlp\MetricExporter;
@@ -24,26 +24,36 @@ use OpenTelemetry\SDK\Resource\ResourceInfo;
 use OpenTelemetry\SemConv\ResourceAttributes;
 use OpenTelemetry\SDK\Metrics\Data\Temporality;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\Factory as LaravelHttpFactory;
+use GuzzleHttp\Psr7\HttpFactory as GuzzleHttpFactory;
+use OpenTelemetry\SDK\Common\Export\TransportFactoryInterface;
+use Illuminate\Support\Facades\Http;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\StreamFactoryInterface;
 
 class LaravelApmServiceProvider extends ServiceProvider
 {
+
+    private $contentType;
+    private $headers;
+
+    private $endpoint;
+
     public function register()
     {
+        $this->endpoint = config('laravel-apm.endpoint');
+        $this->contentType = config('laravel-apm.content_type');
+        $this->headers = config('laravel-apm.headers');
+
         $this->mergeConfigFrom(__DIR__ . '/../config/laravel-apm.php', 'laravel-apm');
 
         $this->app->singleton(ExportingReader::class, function ($app) {
-            $endpoint = config('laravel-apm.endpoint') . '/v1/metrics';
-            $contentType = config('laravel-apm.content_type');
-            $headers = config('laravel-apm.headers');
+            $transportFactory = $this->getTransportFactory();
 
-            $transport = (new OtlpHttpTransportFactory())->create($endpoint, $contentType, $headers);
+            $transport = $transportFactory->create($this->endpoint . '/v1/metrics', $this->contentType, $this->headers);
 
-            $exporter = new MetricExporter($transport, [
-                'counter' => Temporality::CUMULATIVE,
-                'observable_counter' => Temporality::CUMULATIVE,
-                'histogram' => Temporality::DELTA,
-                'observable_gauge' => Temporality::DELTA,
-            ]);
+            $exporter = new MetricExporter($transport, Temporality::CUMULATIVE);
 
             return new ExportingReader($exporter);
         });
@@ -106,12 +116,12 @@ class LaravelApmServiceProvider extends ServiceProvider
 
     private function createTracerProvider()
     {
-        $endpoint = config('laravel-apm.endpoint') . '/v1/traces';
-        $contentType = config('laravel-apm.content_type');
-        $headers = config('laravel-apm.headers');
+        $transportFactory = $this->getTransportFactory();
 
-        $transport = (new OtlpHttpTransportFactory())->create($endpoint, $contentType, $headers);
+        $transport = $transportFactory->create($this->endpoint . '/v1/traces', $this->contentType, $this->headers);
+
         $exporter = new SpanExporter($transport);
+
         $spanProcessor = new SimpleSpanProcessor($exporter);
 
         return TracerProvider::builder()
@@ -124,12 +134,12 @@ class LaravelApmServiceProvider extends ServiceProvider
 
     private function createLoggerProvider()
     {
-        $transport = (new OtlpHttpTransportFactory())->create(
-            config('laravel-apm.endpoint') . '/v1/logs',
-            config('laravel-apm.content_type'),
-            config('laravel-apm.headers')
-        );
+        $transportFactory = $this->getTransportFactory();
+
+        $transport = $transportFactory->create($this->endpoint . '/v1/logs', $this->contentType, $this->headers);
+
         $exporter = new LogsExporter($transport);
+
         return LoggerProvider::builder()
             ->addLogRecordProcessor(new LogProcessor($exporter))
             ->build();
@@ -155,5 +165,39 @@ class LaravelApmServiceProvider extends ServiceProvider
         $loggerProvider = $this->app->make(LoggerProviderInterface::class);
         $otelHandler = new \OpenTelemetry\Contrib\Logs\Monolog\Handler($loggerProvider, 'debug');
         Log::pushHandler($otelHandler);
+    }
+
+    protected function createHttpFactories(): array
+    {
+        // if (class_exists(LaravelHttpFactory::class)) {
+        //     $factory = new LaravelHttpFactory();
+        //     return [
+        //         'client' => $factory->buildClient(),
+        //         'requestFactory' => $factory,
+        //         'streamFactory' => $factory,
+        //     ];
+        // }
+
+        if (class_exists(GuzzleHttpFactory::class)) {
+            $factory = new GuzzleHttpFactory();
+            return [
+                'client' => new \GuzzleHttp\Client(),
+                'requestFactory' => $factory,
+                'streamFactory' => $factory,
+            ];
+        }
+
+        throw new \RuntimeException('No suitable HTTP factories found. Please install Guzzle or use Laravel 8.0+');
+    }
+
+    private function getTransportFactory(): TransportFactoryInterface
+    {
+        $factories = $this->createHttpFactories();
+
+        return new PsrTransportFactory(
+            $factories['client'],
+            $factories['requestFactory'],
+            $factories['streamFactory']
+        );
     }
 }

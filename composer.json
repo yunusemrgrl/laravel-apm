@@ -40,5 +40,8 @@
         "LaravelApm": "Middleware\\LaravelApm\\Facades\\LaravelApm"
       }
     }
+  },
+  "suggest": {
+    "guzzlehttp/guzzle": "Required for OTLP HTTP transport if not using Laravel's HTTP client"
   }
 }

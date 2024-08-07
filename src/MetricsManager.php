@@ -33,25 +33,24 @@ class MetricsManager
             'Total number of HTTP requests',
         );
 
-        // // Gauge (no temporality needed)
-        $this->responseTimeGauge = $meter->createObservableGauge(
-            'laravel.http.response.duration',
-            'seconds',
-            'HTTP response time',
-        );
+        // Gauge (no temporality needed)
+        // $this->responseTimeGauge = $meter->createObservableGauge(
+        //     'laravel.http.response.duration',
+        //     'seconds',
+        //     'HTTP response time',
+        // );
 
-        // Gauge (Delta)
-        $this->requestSizeGauge = $meter->createObservableGauge(
-            'laravel.http.request.size',
-            'bytes',
-            'Size of HTTP requests',
-        );
+        // $this->requestSizeGauge = $meter->createObservableGauge(
+        //     'laravel.http.request.size',
+        //     'bytes',
+        //     'Size of HTTP requests',
+        // );
 
-        $this->responseSizeGauge = $meter->createObservableGauge(
-            'laravel.http.response.size',
-            'bytes',
-            'Size of HTTP responses',
-        );
+        // $this->responseSizeGauge = $meter->createObservableGauge(
+        //     'laravel.http.response.size',
+        //     'bytes',
+        //     'Size of HTTP responses',
+        // );
 
         // Counter (Cumulative)
         $this->statusCounter = $meter->createCounter(
@@ -66,20 +65,20 @@ class MetricsManager
         return $this->requestsCounter;
     }
 
-    public function getResponseTimeGauge(): ObservableGaugeInterface
-    {
-        return $this->responseTimeGauge;
-    }
+    // public function getResponseTimeGauge(): ObservableGaugeInterface
+    // {
+    //     return $this->responseTimeGauge;
+    // }
 
-    public function getRequestSizeGauge(): ObservableGaugeInterface
-    {
-        return $this->requestSizeGauge;
-    }
+    // public function getRequestSizeGauge(): ObservableGaugeInterface
+    // {
+    //     return $this->requestSizeGauge;
+    // }
 
-    public function getResponseSizeGauge(): ObservableGaugeInterface
-    {
-        return $this->responseSizeGauge;
-    }
+    // public function getResponseSizeGauge(): ObservableGaugeInterface
+    // {
+    //     return $this->responseSizeGauge;
+    // }
 
     public function getStatusCounter(): CounterInterface
     {
