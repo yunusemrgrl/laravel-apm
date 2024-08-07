@@ -1,0 +1,44 @@
+{
+  "name": "middleware/laravel-apm",
+  "description": "Middleware integration for Laravel",
+  "type": "library",
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "version": "1.0.0",
+  "autoload": {
+    "psr-4": {
+      "Middleware\\LaravelApm\\": "src/"
+    }
+  },
+  "authors": [
+    {
+      "name": "Hardik Choksi",
+      "email": "hardik.choksi@middleware.io"
+    }
+  ],
+  "require": {
+    "php": "^7.3|^8.0|^8.1",
+    "laravel/framework": "^8.0|^9.0|^10.0",
+    "open-telemetry/opentelemetry": "^1.0",
+    "open-telemetry/exporter-otlp": "^1.0",
+    "open-telemetry/opentelemetry-auto-laravel": "^0.0.26",
+    "open-telemetry/opentelemetry-logger-monolog": "^1.0",
+    "guzzlehttp/promises": "^2.0",
+    "php-http/httplug": "^2.4"
+  },
+  "config": {
+    "allow-plugins": {
+      "php-http/discovery": true
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Middleware\\LaravelApm\\LaravelApmServiceProvider"
+      ],
+      "aliases": {
+        "LaravelApm": "Middleware\\LaravelApm\\Facades\\LaravelApm"
+      }
+    }
+  }
+}
