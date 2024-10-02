@@ -50,7 +50,6 @@ class LaravelApm
     {
         try {
             $result = $this->exportingReader->collect();
-            \Log::info('Metrics exported', ['result' => $result]);
             return $result;
         } catch (\Exception $e) {
             Log::error('Error exporting metrics', [
