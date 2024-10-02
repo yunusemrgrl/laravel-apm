@@ -5,7 +5,6 @@ namespace Middleware\LaravelApm\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use OpenTelemetry\API\Trace\TracerProviderInterface;
-use Illuminate\Support\Facades\Log;
 
 class TracingMiddleware
 {

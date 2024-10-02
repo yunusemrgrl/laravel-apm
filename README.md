@@ -50,38 +50,27 @@ To install the package, follow these steps:
         // ...
         Middleware\LaravelApm\LaravelApmServiceProvider::class,
     ],
-    ```
-
-3. Publish the package configuration:
-
-    ```bash
-    php artisan vendor:publish --provider="Middleware\LaravelAPM\LaravelAPMServiceProvider"
-    ```
-    This will create a config/opentelemetry.php file in your project.
 
 ## Configuration
 
-1. Open `config/laravel-apm.php` and adjust the settings as needed:
+1. This package uses following environment variables:
 
-    ```bash
-    return [
-        'endpoint' => env('APM_EXPORTER_OTLP_ENDPOINT', 'http://localhost:9320'),
-        'service_name' => env('APM_SERVICE_NAME', 'laravel-app'),
-        'content_type' => 'application/x-protobuf',
-        'headers' => [
-            'Content-Type' => 'application/x-protobuf'
-        ],
-    ];
-    ```
+- `MW_TARGET` or `OTEL_EXPORTER_OTLP_ENDPOINT`: The endpoint for middleware agent (default: http://localhost:9320), in container environment it might be `<DOCKER_BRIDGE_GATEWAY_ADDRESS>:9320`.
+
+- `MW_SERVICE_NAME` or `OTEL_SERVICE_NAME`: The name of your service (default: service-<process_id>)
+
+- `OTEL_EXPORTER_OTLP_PROTOCOL`: The protocol that you want to use for exporting data to provided target. (default: http/json)
 
 2. Update your `.env` file with the appropriate values:
 
     ```bash
-    APM_SERVICE_NAME=your-app-name
+    MW_SERVICE_NAME=your-service-name
     ```
 Make sure to set the appropriate values for your OpenTelemetry collector setup.
 
-## Tracing
+## Tracing (Deprecated)
+
+**Note**: This way of tracing is deprecated, please use this [script](https://install.middleware.io/apm/php/laravel-instrument.php) for tracing.
 
 Laravel APM provides a middleware class to enable tracing. 
 To register the tracing middleware, follow these steps:

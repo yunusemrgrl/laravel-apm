@@ -4,7 +4,6 @@ namespace Middleware\LaravelApm;
 
 use Illuminate\Support\ServiceProvider;
 use Middleware\LaravelApm\Commands\ExportMetrics;
-use OpenTelemetry\Contrib\Instrumentation\Laravel\LaravelInstrumentation;
 use OpenTelemetry\API\Trace\TracerProviderInterface;
 use OpenTelemetry\API\Logs\LoggerProviderInterface;
 use OpenTelemetry\API\Metrics\MeterProviderInterface;
@@ -24,13 +23,8 @@ use OpenTelemetry\SDK\Resource\ResourceInfo;
 use OpenTelemetry\SemConv\ResourceAttributes;
 use OpenTelemetry\SDK\Metrics\Data\Temporality;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Http\Client\Factory as LaravelHttpFactory;
 use GuzzleHttp\Psr7\HttpFactory as GuzzleHttpFactory;
 use OpenTelemetry\SDK\Common\Export\TransportFactoryInterface;
-use Illuminate\Support\Facades\Http;
-use Psr\Http\Client\ClientInterface;
-use Psr\Http\Message\RequestFactoryInterface;
-use Psr\Http\Message\StreamFactoryInterface;
 
 class LaravelApmServiceProvider extends ServiceProvider
 {
@@ -42,11 +36,33 @@ class LaravelApmServiceProvider extends ServiceProvider
 
     public function register()
     {
-        $this->endpoint = config('laravel-apm.endpoint');
-        $this->contentType = config('laravel-apm.content_type');
-        $this->headers = config('laravel-apm.headers');
+        $this->endpoint = getenv("OTEL_EXPORTER_OTLP_ENDPOINT") ?: getenv("MW_TARGET") ?: 'http://localhost:9320';
 
-        $this->mergeConfigFrom(__DIR__ . '/../config/laravel-apm.php', 'laravel-apm');
+        $protocol = getenv("OTEL_EXPORTER_OTLP_PROTOCOL", 'http/json');
+        $ct = '';
+       
+        switch ($protocol) {
+            case 'http/json':
+                $ct = 'application/json';
+                break;
+            
+            case 'http/protobuf':
+                $ct = "application/x-protobuf";
+                break;
+
+            case 'grpc':
+                $ct = "application/grpc";
+                break;
+
+            default:
+                $ct = 'application/json';
+                break;
+        }
+
+        $this->contentType = $ct;
+        $this->headers = [
+            'Content-Type' => 'application/json'
+        ];
 
         $this->app->singleton(ExportingReader::class, function ($app) {
             $transportFactory = $this->getTransportFactory();
@@ -87,10 +103,6 @@ class LaravelApmServiceProvider extends ServiceProvider
 
     public function boot()
     {
-        $this->publishes([
-            __DIR__ . '/../config/laravel-apm.php' => config_path('laravel-apm.php'),
-        ], 'config');
-
         try {
             if ($this->app->runningInConsole()) {
                 $this->commands([
@@ -98,7 +110,6 @@ class LaravelApmServiceProvider extends ServiceProvider
                 ]);
             }
 
-            LaravelInstrumentation::register();
             $this->configureLogging();
             $this->app['router']->aliasMiddleware('apm-metrics', \Middleware\LaravelApm\Middleware\MetricsMiddleware::class);
 
@@ -124,10 +135,12 @@ class LaravelApmServiceProvider extends ServiceProvider
 
         $spanProcessor = new SimpleSpanProcessor($exporter);
 
+        $serviceName = getenv("OTEL_SERVICE_NAME") ?: getenv('MW_SERVICE_NAME') ?: 'service-' . getmypid();
+
         return TracerProvider::builder()
             ->addSpanProcessor($spanProcessor)
             ->setResource(ResourceInfoFactory::emptyResource()->merge(ResourceInfo::create(Attributes::create([
-                ResourceAttributes::SERVICE_NAME => config('laravel-apm.service_name'),
+                ResourceAttributes::SERVICE_NAME => $serviceName,
             ]))))
             ->build();
     }
@@ -140,8 +153,13 @@ class LaravelApmServiceProvider extends ServiceProvider
 
         $exporter = new LogsExporter($transport);
 
+        $serviceName = getenv("OTEL_SERVICE_NAME") ?: getenv('MW_SERVICE_NAME') ?: 'service-' . getmypid();
+
         return LoggerProvider::builder()
             ->addLogRecordProcessor(new LogProcessor($exporter))
+            ->setResource(ResourceInfoFactory::emptyResource()->merge(ResourceInfo::create(Attributes::create([
+                ResourceAttributes::SERVICE_NAME => $serviceName,
+            ]))))
             ->build();
     }
 
@@ -149,7 +167,7 @@ class LaravelApmServiceProvider extends ServiceProvider
     {
         $reader = $this->app->make(ExportingReader::class);
 
-        $serviceName = config('laravel-apm.service_name');
+        $serviceName = getenv("OTEL_SERVICE_NAME") ?: getenv('MW_SERVICE_NAME') ?: 'service-' . getmypid();
 
         return MeterProvider::builder()
             ->addReader($reader)
@@ -187,7 +205,7 @@ class LaravelApmServiceProvider extends ServiceProvider
             ];
         }
 
-        throw new \RuntimeException('No suitable HTTP factories found. Please install Guzzle or use Laravel 8.0+');
+        \Illuminate\Support\Facades\Log::error('MW: No suitable HTTP factories found. Please install Guzzle or use Laravel 8.0+');
     }
 
     private function getTransportFactory(): TransportFactoryInterface

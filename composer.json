@@ -20,7 +20,6 @@
     "laravel/framework": "^8.0|^9.0|^10.0",
     "open-telemetry/opentelemetry": "^1.0",
     "open-telemetry/exporter-otlp": "^1.0",
-    "open-telemetry/opentelemetry-auto-laravel": "^0.0.26",
     "open-telemetry/opentelemetry-logger-monolog": "^1.0",
     "guzzlehttp/promises": "^2.0",
     "php-http/httplug": "^2.4"
