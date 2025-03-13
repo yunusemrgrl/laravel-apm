@@ -36,16 +36,61 @@ class LaravelApmServiceProvider extends ServiceProvider
 
     public function register()
     {
-        $this->endpoint = getenv("OTEL_EXPORTER_OTLP_ENDPOINT") ?: getenv("MW_TARGET") ?: 'http://localhost:9320';
+        // Check if OpenTelemetry SDK is disabled
+        if (getenv('OTEL_SDK_DISABLED') === 'true') {
+            // Register empty implementations
+            $this->app->singleton(TracerProviderInterface::class, function ($app) {
+                return new \OpenTelemetry\API\Trace\NoopTracerProvider();
+            });
+
+            $this->app->singleton(LoggerProviderInterface::class, function ($app) {
+                return new \OpenTelemetry\API\Logs\NoopLoggerProvider();
+            });
+
+            $this->app->singleton(MeterProviderInterface::class, function ($app) {
+                return new \OpenTelemetry\API\Metrics\Noop\NoopMeterProvider();
+            });
+
+            $this->app->singleton(ExportingReader::class, function ($app) {
+                // Create a mock ExportingReader that does nothing
+                return new class implements \OpenTelemetry\SDK\Metrics\MetricReaderInterface {
+                    public function collect(): bool
+                    {
+                        return true;
+                    }
+                    public function shutdown(): bool
+                    {
+                        return true;
+                    }
+                    public function forceFlush(): bool
+                    {
+                        return true;
+                    }
+                };
+            });
+
+            $this->app->singleton('laravel-apm', function ($app) {
+                return new LaravelApm(
+                    $app->make(TracerProviderInterface::class),
+                    $app->make(LoggerProviderInterface::class),
+                    $app->make(MeterProviderInterface::class),
+                    $app->make(ExportingReader::class)
+                );
+            });
+
+            return;
+        }
+
+        $this->endpoint = getenv("OTEL_EXPORTER_OTLP_ENDPOINT") ?: getenv("MW_TARGET") ?: 'http://localhost:4318';
 
         $protocol = getenv("OTEL_EXPORTER_OTLP_PROTOCOL", 'http/json');
         $ct = '';
-       
+
         switch ($protocol) {
             case 'http/json':
                 $ct = 'application/json';
                 break;
-            
+
             case 'http/protobuf':
                 $ct = "application/x-protobuf";
                 break;
@@ -114,8 +159,13 @@ class LaravelApmServiceProvider extends ServiceProvider
             $this->app['router']->aliasMiddleware('apm-metrics', \Middleware\LaravelApm\Middleware\MetricsMiddleware::class);
 
             $this->app->terminating(function () {
-                $apm = $this->app->make('laravel-apm');
-                $apm->exportMetrics();
+                try {
+                    $apm = $this->app->make('laravel-apm');
+                    $apm->exportMetrics();
+                } catch (\Exception $e) {
+                    // Silently ignore OpenTelemetry export errors
+                    Log::debug('OpenTelemetry export failed: ' . $e->getMessage());
+                }
             });
 
             $this->app['router']->aliasMiddleware('apm-metrics', \Middleware\LaravelApm\Middleware\MetricsMiddleware::class);
@@ -206,6 +256,13 @@ class LaravelApmServiceProvider extends ServiceProvider
         }
 
         \Illuminate\Support\Facades\Log::error('MW: No suitable HTTP factories found. Please install Guzzle or use Laravel 8.0+');
+
+        // Return empty factories as fallback
+        return [
+            'client' => new \GuzzleHttp\Client(),
+            'requestFactory' => new GuzzleHttpFactory(),
+            'streamFactory' => new GuzzleHttpFactory(),
+        ];
     }
 
     private function getTransportFactory(): TransportFactoryInterface

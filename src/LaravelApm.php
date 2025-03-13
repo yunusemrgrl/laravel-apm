@@ -5,7 +5,7 @@ namespace Middleware\LaravelApm;
 use OpenTelemetry\API\Trace\TracerProviderInterface;
 use OpenTelemetry\API\Logs\LoggerProviderInterface;
 use OpenTelemetry\API\Metrics\MeterProviderInterface;
-use OpenTelemetry\SDK\Metrics\MetricReader\ExportingReader;
+use OpenTelemetry\SDK\Metrics\MetricReaderInterface;
 use Illuminate\Support\Facades\Log;
 
 class LaravelApm
@@ -23,7 +23,7 @@ class LaravelApm
         TracerProviderInterface $tracerProvider,
         LoggerProviderInterface $loggerProvider,
         MeterProviderInterface $meterProvider,
-        ExportingReader $exportingReader
+        MetricReaderInterface $exportingReader
     ) {
         $this->tracerProvider = $tracerProvider;
         $this->loggerProvider = $loggerProvider;
